@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YouTube Music Playlist</title>
+  <!-- Thêm Bootstrap CSS -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #121212; /* Màu nền dark mode */
+      color: #e0e0e0; /* Màu chữ sáng */
+    }
+    .container {
+      max-width: 1200px;
+      margin: 20px auto;
+      background-color: #1e1e1e; /* Nền container dark mode */
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.5); /* Đổ bóng */
+    }
+    .input-group .form-control, .btn {
+      background-color: #2e2e2e; /* Nền input và button trong dark mode */
+      color: #e0e0e0;
+      border: 1px solid #444;
+    }
+    .input-group .form-control:focus, .btn:focus {
+      background-color: #3e3e3e; /* Nền khi focus trong dark mode */
+      color: #e0e0e0;
+      border-color: #555;
+    }
+    #playlist-info {
+      margin-top: 20px;
+      overflow-y: auto;
+      height: 305px; /* Cùng chiều cao với media player */
+      width: 100%;
+    }
+    #playlist-info::-webkit-scrollbar {
+      width: 12px; /* Độ rộng của thanh cuộn */
+    }
+    #playlist-info::-webkit-scrollbar-track {
+      background: #121212; /* Màu nền của track thanh cuộn */
+    }
+    #playlist-info::-webkit-scrollbar-thumb {
+      background-color: #333; /* Màu của thanh cuộn */
+      border-radius: 10px; /* Bo tròn thanh cuộn */
+      border: 3px solid #121212; /* Màu nền giữa thanh cuộn và track */
+    }
+    .error {
+      color: #ff6666; /* Màu lỗi */
+    }
+    .track {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+      cursor: pointer;
+      padding: 10px;
+      border: 1px solid #444;
+      border-radius: 5px;
+      background-color: #1e1e1e;
+      transition: background-color 0.3s;
+      width: 100%; /* Chỉnh width của track button */
+    }
+    .track:hover {
+      background-color: #2e2e2e;
+    }
+    .track img {
+      margin-right: 10px;
+      width: 50px;
+      height: 50px;
+    }
+    .track-info {
+      display: flex;
+      flex-direction: column;
+      flex-grow: 1;
+    }
+    .track-info .name, .track-info .artists {
+      font-size: 0.9em; /* Thu nhỏ font size */
+      white-space: nowrap; /* Tránh xuống dòng */
+      overflow: hidden;
+      text-overflow: ellipsis; /* Rút ngắn nếu quá dài */
+      color: #e0e0e0; /* Màu chữ trong dark mode */
+    }
+    .track-info .name {
+      font-weight: bold;
+    }
+    .track-info .artists {
+      color: #aaa;
+    }
+    #media-player {
+      width: 100%; /* Media player rộng 100% */
+      height: 305px; /* Chiều cao của media player */
+      background-color: #333; /* Nền media player trong dark mode */
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 class="text-center mb-4">YouTube Music Playlist</h1>
+    <div class="input-group mb-3">
+      <input type="text" class="form-control form-control-sm" id="playlist-id" placeholder="Enter Playlist ID">
+      <div class="input-group-append">
+        <button class="btn btn-primary btn-sm" id="fetch-playlist">Fetch Playlist</button>
+      </div>
+    </div>
+    <div class="row">
+	      <div class="col-md-6">
+        <div id="media-player-container" class="mt-4">
+          <h2>Now Playing:</h2>
+          <div id="media-player" class="bg-dark d-flex justify-content-center align-items-center"></div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div id="playlist-info-container" class="mt-4">
+          <h2>Playlist:</h2>
+          <div id="playlist-info"></div>
+        </div>
+      </div>
+    </div>
+    <div id="error-message" class="error mt-4"></div>
+  </div>
+    <script>
+    let player;
+    let playlist = [];
+    let currentIndex = 0;
+
+    function onYouTubeIframeAPIReady() {
+  player = new YT.Player('media-player', {
+    height: '305px',
+    width: '100%',
+    playerVars: {
+      'autoplay': 1,
+      'controls': 1,
+      'showinfo': 0,
+      'modestbranding': 0,
+      'rel': 0,
+      'iv_load_policy': 0
+    },
+    events: {
+      'onReady': onPlayerReady,
+      'onStateChange': onPlayerStateChange
+    }
+  });
+}
+
+function onPlayerReady(event) {
+  // Player is ready
+}
+
+function onPlayerStateChange(event) {
+  if (event.data == YT.PlayerState.ENDED) {
+    playNextVideo();
+  }
+}
+
+function playNextVideo() {
+  currentIndex++;
+  if (currentIndex < playlist.length) {
+    playVideo(playlist[currentIndex]);
+  } else {
+    currentIndex = 0;  // Reset index để quay lại bài đầu tiên (nếu cần)
+  }
+}
+document.getElementById('fetch-playlist').addEventListener('click', () => {
+  const playlistId = document.getElementById('playlist-id').value;
+  fetch(`/playlist/${playlistId}`)
+    .then(response => response.json())
+    .then(data => {
+      const playlistInfo = document.getElementById('playlist-info');
+      if (data.error) {
+        document.getElementById('error-message').innerText = 'Error fetching playlist';
+        return;
+      }
+      document.getElementById('error-message').innerText = ''; // Xóa thông báo lỗi
+      playlistInfo.innerHTML = '';
+      playlist = [];
+      data.items.forEach((item, index) => {
+        const videoId = item.snippet.resourceId.videoId;
+        playlist.push(videoId);
+        const trackElement = document.createElement('div');
+        trackElement.classList.add('track', 'mb-2', 'p-2', 'd-flex', 'align-items-center');
+        let title = item.snippet.title;
+        if (title.length > 30) {
+          title = title.substring(0, 30) + '...';
+        }
+        const artist = item.snippet.videoOwnerChannelTitle;
+        trackElement.innerHTML = `
+          <div class="flex-shrink-0">
+            <img src="${item.snippet.thumbnails.default.url}" class="img-fluid" alt="${title}" style="width: 50px; height: 50px;">
+          </div>
+          <div class="flex-grow-1 ms-3">
+            <div class="card-body p-2">
+              <h6 class="card-title track-info name">${title}</h6>
+              <p class="card-text track-info artists mb-0">${artist}</p>
+            </div>
+          </div>
+        `;
+        trackElement.addEventListener('click', () => {
+          currentIndex = index;
+          playVideo(videoId);
+        });
+        playlistInfo.appendChild(trackElement);
+              // Tự động phát video đầu tiên
+        if (index === 0) {
+          currentIndex = 0;
+          playVideo(videoId);
+        }
+      });
+    })
+    .catch(error => {
+      document.getElementById('error-message').innerText = 'Error fetching playlist';
+      console.error('Error:', error);
+    });
+});
+
+function playVideo(videoId) {
+  player.loadVideoById(videoId);
+}
+  </script>
+    <!-- Thêm Bootstrap JS và Popper.js, jQuery -->
+  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.2/dist/umd/popper.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+  <!-- Thêm YouTube IFrame API -->
+  <script src="https://www.youtube.com/iframe_api"></script>
+</body>
+</html>
